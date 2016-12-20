@@ -1,0 +1,14 @@
+<RCC>
+    <qresource prefix="/">
+        <file>main.qml</file>
+        <file>images/close.png</file>
+        <file>images/maximize.png</file>
+        <file>images/minimize.png</file>
+        <file>images/folder.png</file>
+        <file>images/orientation.png</file>
+        <file>images/shape.png</file>
+        <file>qml_components/OpenFolderContent.qml</file>
+        <file>qml_components/ResultMapContent.qml</file>
+        <file>qml_components/EngineContent.qml</file>
+    </qresource>
+</RCC>
