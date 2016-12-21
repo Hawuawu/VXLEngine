@@ -14,114 +14,276 @@ bool VXLESRTMLoader::loadSRTMData(QString folder)
 
     emit loadStarted();
 
-    QList<SRTMPixmap> data;
-    int northMin = 999999;
-    int northMax = -999999;
-    int southMin = 999999;
-    int southMax = -999999;
+    QList<SRTMPixmap> northWestData;
+    QList<SRTMPixmap> northEastData;
+    QList<SRTMPixmap> southWestData;
+    QList<SRTMPixmap> southEastData;
 
-    int defaultWidth = 1024;
-    int defaultHeight = 1024;
+    std::vector<std::vector<int>> locationMatrix(4, std::vector<int>(360));
 
     QDirIterator it(folder, QDirIterator::NoIteratorFlags);
     while(it.hasNext()) {
         emit loadedPercent(0);
         QString file = it.next();
         //(N[0-9]+E[0-9]+).*.jpg
-        QRegExp rx = QRegExp("N([0-9]+)E([0-9]+).*.jpg");
-        rx.indexIn(file);
-        QStringList qsl = rx.capturedTexts();
-        if(qsl.count() == 3) {
-            if(qsl[0] != "") {
-                int north = qsl[1].toInt();
-                int south = qsl[2].toInt();
-                if(north > 0 && south > 0) {
-                    SRTMPixmap srtmPixmap;
-                    srtmPixmap.N = north;
-                    srtmPixmap.S = south;
-                    srtmPixmap.pixmap = QPixmap(file);
-                    data.append(srtmPixmap);
+
+        QRegExp neRx = QRegExp("N([0-9]+)E([0-9]+).*.jpg");
+        QRegExp nwRx = QRegExp("N([0-9]+)W([0-9]+).*.jpg");
+        QRegExp seRx = QRegExp("S([0-9]+)E([0-9]+).*.jpg");
+        QRegExp swRx = QRegExp("S([0-9]+)W([0-9]+).*.jpg");
+
+        neRx.indexIn(file);
+        QStringList neQsl = neRx.capturedTexts();
+
+        nwRx.indexIn(file);
+        QStringList nwQsl = nwRx.capturedTexts();
+
+        seRx.indexIn(file);
+        QStringList seQsl = seRx.capturedTexts();
+
+        swRx.indexIn(file);
+        QStringList swQsl = swRx.capturedTexts();
+
+        if(neQsl.count() == 3) {
+            if(neQsl[0] != "") {
+                int north = neQsl[1].toInt();
+                int east = neQsl[2].toInt();
+
+                locationMatrix[LOCATION_MATRIX_NORTH_INDEX][north] ++;
+                locationMatrix[LOCATION_MATRIX_EAST_INDEX][east] ++;
+
+                SRTMPixmap srtmPixmap;
+                srtmPixmap.N = north;
+                srtmPixmap.E = east;
+                srtmPixmap.pixmap = QPixmap(file);
+                srtmPixmap.originalFile = file;
+
+                northEastData.append(srtmPixmap);
+
+                int i = northEastData.length() - 1;
+                while(i > 0 && northEastData[i].N > northEastData[i-1].N) {
+                    SRTMPixmap temp = northEastData[i-1];
+                    northEastData.replace(i - 1, northEastData[i]);
+                    northEastData.replace(i, temp);
+                    i --;
+                }
+
+                while(i > 0 && northEastData[i].E < northEastData[i-1].E) {
+                    SRTMPixmap temp = northEastData[i-1];
+                    northEastData.replace(i - 1, northEastData[i]);
+                    northEastData.replace(i, temp);
+                    i --;
+                }
+
+            }
+        }
+
+        if(nwQsl.count() == 3) {
+            if(nwQsl[0] != "") {
+                int north = nwQsl[1].toInt();
+                int west = nwQsl[2].toInt();
 
 
-                    if(north < northMin ) {
-                        northMin = north;
-                    }
+                locationMatrix[LOCATION_MATRIX_NORTH_INDEX][north] ++;
+                locationMatrix[LOCATION_MATRIX_WEST_INDEX][west] ++;
 
-                    if(north > northMax) {
-                        northMax = north;
-                    }
+                SRTMPixmap srtmPixmap;
+                srtmPixmap.N = north;
+                srtmPixmap.W = west;
+                srtmPixmap.pixmap = QPixmap(file);
+                srtmPixmap.originalFile = file;
 
-                    if(south < southMin) {
-                        southMin = south;
-                    }
+                northWestData.append(srtmPixmap);
 
-                    if(south > southMax) {
-                        southMax = south;
-                    }
+                int i = northWestData.length() - 1;
+                while(i > 0 && northWestData[i].N > northWestData[i-1].N) {
+                    SRTMPixmap temp = northWestData[i-1];
+                    northWestData.replace(i - 1, northWestData[i]);
+                    northWestData.replace(i, temp);
+                    i --;
+                }
 
+                while(i > 0 && northWestData[i].W < northWestData[i-1].W) {
+                    SRTMPixmap temp = northWestData[i-1];
+                    northWestData.replace(i - 1, northWestData[i]);
+                    northWestData.replace(i, temp);
+                    i --;
                 }
             }
         }
 
+        if(seQsl.count() == 3) {
+            if(seQsl[0] != "") {
+                int south = seQsl[1].toInt();
+                int east = seQsl[2].toInt();
+
+                locationMatrix[LOCATION_MATRIX_SOUTH_INDEX][south] ++;
+                locationMatrix[LOCATION_MATRIX_EAST_INDEX][east] ++;
+
+                SRTMPixmap srtmPixmap;
+                srtmPixmap.S = south;
+                srtmPixmap.E = east;
+                srtmPixmap.pixmap = QPixmap(file);
+                srtmPixmap.originalFile = file;
+
+                southEastData.append(srtmPixmap);
+
+
+                int i = southEastData.length() - 1;
+                while(i > 0 && southEastData[i].S < southEastData[i-1].S) {
+                    SRTMPixmap temp = southEastData[i-1];
+                    southEastData.replace(i - 1, southEastData[i]);
+                    southEastData.replace(i, temp);
+                    i --;
+                }
+
+                while(i > 0 && southEastData[i].E < southEastData[i-1].E) {
+                    SRTMPixmap temp = southEastData[i-1];
+                    southEastData.replace(i - 1, southEastData[i]);
+                    southEastData.replace(i, temp);
+                    i --;
+                }
+            }
+        }
+
+        if(swQsl.count() == 3) {
+            if(swQsl[0] != "") {
+                int south = swQsl[1].toInt();
+                int west = swQsl[2].toInt();
+
+                locationMatrix[LOCATION_MATRIX_SOUTH_INDEX][south] ++;
+                locationMatrix[LOCATION_MATRIX_WEST_INDEX][west] ++;
+
+                SRTMPixmap srtmPixmap;
+                srtmPixmap.S = south;
+                srtmPixmap.W = west;
+                srtmPixmap.pixmap = QPixmap(file);
+                srtmPixmap.originalFile = file;
+
+                southWestData.append(srtmPixmap);
+
+                int i = southWestData.length() - 1;
+                while(i > 0 && southWestData[i].S < southWestData[i-1].S) {
+                    SRTMPixmap temp = southWestData[i-1];
+                    southWestData.replace(i - 1, southWestData[i]);
+                    southWestData.replace(i, temp);
+                    i --;
+                }
+
+                while(i > 0 && southWestData[i].W < southWestData[i-1].W) {
+                    SRTMPixmap temp = southWestData[i-1];
+                    southWestData.replace(i - 1, southWestData[i]);
+                    southWestData.replace(i, temp);
+                    i --;
+                }
+            }
+        }
+
+
         emit loadedPercent(100);
     }
 
+    int widthCount = 0;
+    int heightCount = 0;
+
+    for(int i = 0; i < 360; i++) {
+        widthCount += locationMatrix[LOCATION_MATRIX_NORTH_INDEX][i];
+        widthCount += locationMatrix[LOCATION_MATRIX_SOUTH_INDEX][i];
+        heightCount += locationMatrix[LOCATION_MATRIX_EAST_INDEX][i];
+        heightCount += locationMatrix[LOCATION_MATRIX_WEST_INDEX][i];
+    }
+
     emit loadedPercent(0);
-    std::sort(data.begin(), data.end());
-    emit loadedPercent(100);
 
-    int deltaN = northMax - northMin;
-    int deltaS = southMax - southMin;
+    int aspectRatio = (heightCount * DEFAULT_HEIGHT) / (widthCount * DEFAULT_WIDTH);
 
-    int totalIterations = deltaN * deltaS;
+    int widthRatio = 9600 / (widthCount * DEFAULT_WIDTH);
+    int heightRatio = (9600 * aspectRatio) / (heightCount * DEFAULT_HEIGHT);
 
-    emit loadedPercent(0);
+    QImage resultImage(widthCount * DEFAULT_WIDTH , heightCount * DEFAULT_HEIGHT , QImage::Format_Grayscale8);
+    QPainter p(&resultImage);
+    qDebug() << widthCount * DEFAULT_WIDTH << " x " << heightCount * DEFAULT_HEIGHT;
 
+    int xDelta = 0;
+    int yDelta = 0;
 
-    for(int n = northMin; n <= northMax; n++) {
-        for(int s = southMin; s <= southMax; s++) {
-             qDebug() << QString::number(s) << QString::number(n);
-             QPixmap map = getPixmapForCoordinates(data, n, s, 1024, 1024, true);
-           // emit loadedPercent(totalIterations);
+    qDebug() << "-------- NW --------";
+    for (SRTMPixmap map : northWestData) {
+        qDebug() << map.N << "-" << map.W;
+
+    }
+
+    if(northEastData.size() > 0) {
+        int lastN = northEastData[0].N;
+        int lastE = northEastData[0].E;
+
+        int xOriginDelta = xDelta;
+
+        qDebug() << "-------- NE --------";
+        for (SRTMPixmap map : northEastData) {
+            qDebug() << map.N << "-" << map.E;
+
+            if(lastN == map.N && lastE != map.E) {
+                xDelta ++;
+            } else if(lastN != map.N) {
+                yDelta ++;
+                xDelta = xOriginDelta;
+            }
+
+         //   p.drawPixmap(xDelta * DEFAULT_WIDTH, yDelta * DEFAULT_HEIGHT, map.pixmap.scaled());
+
+            emit loadedImage(xDelta * DEFAULT_WIDTH, yDelta * DEFAULT_HEIGHT, map.pixmap.toImage());
+            lastN = map.N;
+            lastE = map.E;
         }
     }
+
+    qDebug() << "-------- SW --------";
+    for (SRTMPixmap map : southWestData) {
+        qDebug() << map.S << "-" << map.W;
+    }
+
+    qDebug() << "-------- SE --------";
+    for (SRTMPixmap map : southEastData) {
+        qDebug() << map.S << "-" << map.E;
+    }
+
+    QImage* temp = resultImage_;
+    resultImage_ = &resultImage;
+
+    if(resultImage_->width() > 0 && resultImage_->height() > 0)
+    {
+        resultImage_->save(tempImageFile_);
+    }
+
     emit loadedPercent(100);
     emit loadDone();
+
+    if(temp != 0) {
+        delete temp;
+    }
+
     return true;
 }
 
-
-QPixmap VXLESRTMLoader::getPixmapForCoordinates(
-        QList<SRTMPixmap> dataIterator,
-        int n,
-        int s,
-        int defaultWidth,
-        int defaultHeight,
-        bool sorted
-        ) {
-
-    for(SRTMPixmap data : dataIterator) {
-        if(data.N == n && data.S == s) {
-            return data.pixmap;
-        } else if (data.N > n && sorted)
-        {
-            QPixmap pixmap(defaultWidth, defaultHeight);
-            return pixmap;
-        }
-    }
-
-    QPixmap pixmap(defaultWidth, defa   ultHeight);
-    return pixmap;
+QImage* VXLESRTMLoader::getResultMap()
+{
+    return resultImage_;
 }
 
-
-QPixmap VXLESRTMLoader::getResultPixMap()
+void VXLESRTMLoader::setResultMap(QImage* resultImage)
 {
-    return resultPixMap_;
+    resultImage_ = resultImage;
+    emit resultMapChanged();
 }
 
-void VXLESRTMLoader::setResultPixMap(QPixmap resultPixMap)
+QString VXLESRTMLoader::getTempImageFile()
 {
-    resultPixMap_ = resultPixMap;
-    emit resultPixMapChanged();
+    return tempImageFile_;
+}
+
+void VXLESRTMLoader::setTempImageFile(QString tempImageFile)
+{
+    tempImageFile_ = tempImageFile;
+    emit tempImageFileChanged();
 }

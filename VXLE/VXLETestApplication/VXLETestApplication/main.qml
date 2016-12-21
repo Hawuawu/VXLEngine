@@ -285,10 +285,12 @@ ApplicationWindow {
 
                     onSelected: {
                         openFolderBackground.color = "#46aae0"
+                        openFolderContent.visible = true;
                     }
 
                     onDeselected: {
                         openFolderBackground.color = "#3e4f63"
+                        openFolderContent.visible = false;
                     }
                 }
 
@@ -350,10 +352,12 @@ ApplicationWindow {
 
                     onSelected: {
                         resultMapBackground.color = "#46aae0"
+                        resultMapContent.visible = true;
                     }
 
                     onDeselected: {
                         resultMapBackground.color = "#3e4f63"
+                        resultMapContent.visible = false;
                     }
                 }
 
@@ -413,6 +417,7 @@ ApplicationWindow {
 
                     onSelected: {
                         engineBackground.color = "#46aae0"
+
                     }
 
                     onDeselected: {
@@ -461,6 +466,8 @@ ApplicationWindow {
 
         OpenFolderContent {
 
+            id:openFolderContent
+
             applicationSettings: appSettings
 
             anchors.bottom: parent.bottom
@@ -471,9 +478,17 @@ ApplicationWindow {
             anchors.rightMargin: 0
             anchors.top: windowMenuSeparator.bottom
             anchors.topMargin: 0
+
+            onLoadedImage: {
+                resultMapMenuItem.enable()
+            }
         }
 
         ResultMapContent {
+            id: resultMapContent
+
+            visible: false
+
             anchors.bottom: parent.bottom
             anchors.bottomMargin: 0
             anchors.left: parent.left

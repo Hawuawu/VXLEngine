@@ -9,6 +9,8 @@ Rectangle {
     color: "#e1e1e1"
 
     property ApplicationSettings applicationSettings;
+    signal loadedImage(Image image);
+    signal loadedPartImage(int x, int y, Image image)
 
     Rectangle {
         id: bg
@@ -33,6 +35,11 @@ Rectangle {
 
             onLoadDone: {
                 loaderContainer.visible = false;
+                loadedImage(srtmLoader.resultImage)
+            }
+
+            onLoadedImage: {
+                loadedPartImage(x, y, image)
             }
         }
 
