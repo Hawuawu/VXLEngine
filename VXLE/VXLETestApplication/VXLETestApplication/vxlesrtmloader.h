@@ -47,8 +47,6 @@ public:
     QString getTempImageFile();
     void setTempImageFile(QString);
 
-
-
 signals:
     void resultMapChanged();
     void tempImageFileChanged();

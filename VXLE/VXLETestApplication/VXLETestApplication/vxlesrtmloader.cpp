@@ -49,8 +49,8 @@ bool VXLESRTMLoader::loadSRTMData(QString folder)
                 int north = neQsl[1].toInt();
                 int east = neQsl[2].toInt();
 
-                locationMatrix[LOCATION_MATRIX_NORTH_INDEX][north] ++;
-                locationMatrix[LOCATION_MATRIX_EAST_INDEX][east] ++;
+                locationMatrix[LOCATION_MATRIX_NORTH_INDEX][north] = 1;
+                locationMatrix[LOCATION_MATRIX_EAST_INDEX][east] = 1;
 
                 SRTMPixmap srtmPixmap;
                 srtmPixmap.N = north;
@@ -84,8 +84,8 @@ bool VXLESRTMLoader::loadSRTMData(QString folder)
                 int west = nwQsl[2].toInt();
 
 
-                locationMatrix[LOCATION_MATRIX_NORTH_INDEX][north] ++;
-                locationMatrix[LOCATION_MATRIX_WEST_INDEX][west] ++;
+                locationMatrix[LOCATION_MATRIX_NORTH_INDEX][north] = 1;
+                locationMatrix[LOCATION_MATRIX_WEST_INDEX][west] = 1;
 
                 SRTMPixmap srtmPixmap;
                 srtmPixmap.N = north;
@@ -117,8 +117,8 @@ bool VXLESRTMLoader::loadSRTMData(QString folder)
                 int south = seQsl[1].toInt();
                 int east = seQsl[2].toInt();
 
-                locationMatrix[LOCATION_MATRIX_SOUTH_INDEX][south] ++;
-                locationMatrix[LOCATION_MATRIX_EAST_INDEX][east] ++;
+                locationMatrix[LOCATION_MATRIX_SOUTH_INDEX][south] = 1;
+                locationMatrix[LOCATION_MATRIX_EAST_INDEX][east] = 1;
 
                 SRTMPixmap srtmPixmap;
                 srtmPixmap.S = south;
@@ -151,8 +151,8 @@ bool VXLESRTMLoader::loadSRTMData(QString folder)
                 int south = swQsl[1].toInt();
                 int west = swQsl[2].toInt();
 
-                locationMatrix[LOCATION_MATRIX_SOUTH_INDEX][south] ++;
-                locationMatrix[LOCATION_MATRIX_WEST_INDEX][west] ++;
+                locationMatrix[LOCATION_MATRIX_SOUTH_INDEX][south] = 1;
+                locationMatrix[LOCATION_MATRIX_WEST_INDEX][west] = 1;
 
                 SRTMPixmap srtmPixmap;
                 srtmPixmap.S = south;
@@ -187,22 +187,34 @@ bool VXLESRTMLoader::loadSRTMData(QString folder)
     int heightCount = 0;
 
     for(int i = 0; i < 360; i++) {
-        widthCount += locationMatrix[LOCATION_MATRIX_NORTH_INDEX][i];
-        widthCount += locationMatrix[LOCATION_MATRIX_SOUTH_INDEX][i];
-        heightCount += locationMatrix[LOCATION_MATRIX_EAST_INDEX][i];
-        heightCount += locationMatrix[LOCATION_MATRIX_WEST_INDEX][i];
+        heightCount += locationMatrix[LOCATION_MATRIX_NORTH_INDEX][i];
+        heightCount += locationMatrix[LOCATION_MATRIX_SOUTH_INDEX][i];
+        widthCount += locationMatrix[LOCATION_MATRIX_EAST_INDEX][i];
+        widthCount += locationMatrix[LOCATION_MATRIX_WEST_INDEX][i];
     }
 
     emit loadedPercent(0);
 
-    int aspectRatio = (heightCount * DEFAULT_HEIGHT) / (widthCount * DEFAULT_WIDTH);
+    int expectedWidth = widthCount * DEFAULT_WIDTH;
+    int expectedHeight = heightCount * DEFAULT_HEIGHT;
 
-    int widthRatio = 9600 / (widthCount * DEFAULT_WIDTH);
-    int heightRatio = (9600 * aspectRatio) / (heightCount * DEFAULT_HEIGHT);
 
-    QImage resultImage(widthCount * DEFAULT_WIDTH , heightCount * DEFAULT_HEIGHT , QImage::Format_Grayscale8);
+    int aspectRatio = expectedHeight / expectedWidth;
+
+    int supportedWidth = 10000;
+    int supportedHeight = 10000;
+
+    float zoom = 1;
+
+    if(aspectRatio <= 1) {
+        if(supportedWidth < expectedWidth) zoom = (float) supportedWidth / (float) expectedWidth;
+    } else {
+        if(supportedHeight < expectedHeight) zoom = (float) supportedHeight / (float) expectedHeight;
+    }
+
+    QImage resultImage(expectedWidth * zoom , expectedHeight * zoom , QImage::Format_Grayscale8);
     QPainter p(&resultImage);
-    qDebug() << widthCount * DEFAULT_WIDTH << " x " << heightCount * DEFAULT_HEIGHT;
+    qDebug() << expectedWidth * zoom  << " x " << expectedHeight * zoom << " - " << DEFAULT_WIDTH * zoom;
 
     int xDelta = 0;
     int yDelta = 0;
@@ -230,7 +242,11 @@ bool VXLESRTMLoader::loadSRTMData(QString folder)
                 xDelta = xOriginDelta;
             }
 
-         //   p.drawPixmap(xDelta * DEFAULT_WIDTH, yDelta * DEFAULT_HEIGHT, map.pixmap.scaled());
+             p.drawPixmap(
+                         xDelta * DEFAULT_WIDTH * zoom - 1,
+                         yDelta * DEFAULT_HEIGHT * zoom - 1,
+                         map.pixmap.scaled(DEFAULT_WIDTH * zoom, DEFAULT_HEIGHT * zoom, Qt::IgnoreAspectRatio)
+                         );
 
             emit loadedImage(xDelta * DEFAULT_WIDTH, yDelta * DEFAULT_HEIGHT, map.pixmap.toImage());
             lastN = map.N;
@@ -260,7 +276,7 @@ bool VXLESRTMLoader::loadSRTMData(QString folder)
     emit loadDone();
 
     if(temp != 0) {
-        delete temp;
+   //     delete temp;
     }
 
     return true;
