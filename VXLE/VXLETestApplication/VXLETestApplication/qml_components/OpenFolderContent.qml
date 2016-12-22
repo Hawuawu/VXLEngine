@@ -9,8 +9,8 @@ Rectangle {
     color: "#e1e1e1"
 
     property ApplicationSettings applicationSettings;
-    signal loadedImage(Image image);
-    signal loadedPartImage(int x, int y, Image image)
+
+    signal loadedImage(int sourceWidth, int sourceHeight, string source)
 
     Rectangle {
         id: bg
@@ -26,21 +26,25 @@ Rectangle {
             id: srtmLoader
 
             onLoadStarted: {
+                console.log("Loader started")
                 loaderContainer.visible = true;
+                loadDataButton.visible = false;
             }
 
             onLoadedPercent: {
                 loadingBar.setValue(percent)
+                loadingBarLabel.text = qsTr(statusMessage)
+
             }
 
             onLoadDone: {
                 loaderContainer.visible = false;
-                loadedImage(srtmLoader.resultImage)
+                loadDataButton.visible = true;
+                console.log(imageWidth, imageHeight, source)
+                loadedImage(imageWidth, imageHeight, source)
             }
 
-            onLoadedImage: {
-                loadedPartImage(x, y, image)
-            }
+
         }
 
         Text {
@@ -150,6 +154,45 @@ Rectangle {
             }
         }
 
+        Rectangle {
+            id: loaderContainer
+            color: "#ffffff"
+            anchors.fill: parent
+            visible: false
+            border.color: "#46aae0"
+            border.width: 2
+
+            z: 10
+
+            ProgressBar {
+                id: loadingBar
+                y: 125
+                height: 23
+                maximumValue: 100
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.left: parent.left
+                anchors.leftMargin: 10
+                anchors.right: parent.right
+                anchors.rightMargin: 10
+            }
+
+            Text {
+                id: loadingBarLabel
+                height: 24
+                color: "#46aae0"
+                text: qsTr("Loading ...")
+                anchors.top: loadingBar.bottom
+                anchors.topMargin: 2
+                horizontalAlignment: Text.AlignRight
+                verticalAlignment: Text.AlignVCenter
+                anchors.left: loadingBar.left
+                anchors.leftMargin: 0
+                anchors.right: loadingBar.right
+                anchors.rightMargin: 0
+                font.pixelSize: 12
+            }
+        }
+
         Text {
             id: errorMessageLabel
             height: 24
@@ -165,49 +208,7 @@ Rectangle {
             anchors.leftMargin: 10
             font.pixelSize: 12
         }
-    }
 
-    Rectangle {
-        id: loaderContainer
-        color: "#ffffff"
-        visible: false
-        border.color: "#46aae0"
-        border.width: 2
-        anchors.top: bg.top
-        anchors.topMargin: 0
-        anchors.bottom: bg.bottom
-        anchors.bottomMargin: 0
-        anchors.left: bg.left
-        anchors.leftMargin: 0
-        anchors.right: bg.right
-        anchors.rightMargin: 0
-
-        ProgressBar {
-            id: loadingBar
-            y: 125
-            height: 23
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.left: parent.left
-            anchors.leftMargin: 10
-            anchors.right: parent.right
-            anchors.rightMargin: 10
-        }
-
-        Text {
-            id: loadingBarLabel
-            height: 24
-            color: "#46aae0"
-            text: qsTr("Loading ...")
-            anchors.top: loadingBar.bottom
-            anchors.topMargin: 2
-            horizontalAlignment: Text.AlignRight
-            verticalAlignment: Text.AlignVCenter
-            anchors.left: loadingBar.left
-            anchors.leftMargin: 0
-            anchors.right: loadingBar.right
-            anchors.rightMargin: 0
-            font.pixelSize: 12
-        }
     }
 
 

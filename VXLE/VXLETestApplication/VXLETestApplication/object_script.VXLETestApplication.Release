@@ -4,9 +4,11 @@ INPUT(
 ./build-release\.obj\vxlemenuitem.o
 ./build-release\.obj\vxletestapplicationsettings.o
 ./build-release\.obj\vxlesrtmloader.o
+./build-release\.obj\vxlemaprenderer.o
 ./build-release\.obj\qrc_qml.o
 ./build-release\.obj\moc_vxlemenucontroller.o
 ./build-release\.obj\moc_vxlemenuitem.o
 ./build-release\.obj\moc_vxletestapplicationsettings.o
 ./build-release\.obj\moc_vxlesrtmloader.o
+./build-release\.obj\moc_vxlemaprenderer.o
 );

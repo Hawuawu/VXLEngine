@@ -7,6 +7,9 @@
 #include <QPainter>
 #include <QFile>
 #include <QDirIterator>
+#include <QSharedPointer>
+#include <QThread>
+#include <QTimer>
 #include <QDebug>
 
 #define LOCATION_MATRIX_NORTH_INDEX 0
@@ -30,6 +33,31 @@ struct SRTMPixmap {
 
 };
 
+class VXLESRTMLoaderWorker : public QObject
+{
+    Q_OBJECT
+
+public:
+    explicit VXLESRTMLoaderWorker(QObject *parent = 0);
+    ~VXLESRTMLoaderWorker();
+    QString folder = "";
+    QString tempImageFile = "";
+
+public slots:
+    void startWorker();
+    void checkForFileEmptiness();
+
+signals:
+    void loadStarted();
+    void loadedPercent(int percent, QString statusMessage);
+    void loadDone(int imageWidth, int imageHeight, QString source);
+    void workerFinished();
+
+private:
+    QTimer* timer = 0;
+    int expectedWidth_;
+    int expectedHeight_;
+};
 
 class VXLESRTMLoader : public QObject
 {
@@ -52,14 +80,22 @@ signals:
     void tempImageFileChanged();
 
     void loadStarted();
-    void loadedImage(int x, int y, QImage image);
-    void loadedPercent(int percent);
-    void loadDone();
+    void loadedPercent(int percent, QString statusMessage);
+    void loadDone(int imageWidth, int imageHeight, QString source);
 
 public slots:
+   // void workerThreadFinished(QPrivateSignal);
+
+
 private:
+    QSharedPointer<QThread> workerThread_;
+    QSharedPointer<VXLESRTMLoaderWorker> worker_;
+
     QImage *resultImage_ = 0;
     QString tempImageFile_ = "temp.png";
 };
+
+
+
 
 #endif // VXLESRTMLOADER_H

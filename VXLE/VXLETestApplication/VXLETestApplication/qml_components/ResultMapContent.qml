@@ -1,53 +1,44 @@
 import QtQuick 2.0
 
-Item {
+import com.vxle.testapplication 1.0
 
-    function setMap(image) {
-        resultMap.so = image
+Rectangle {
+    color: "#e1e1e1"
+
+    function setMap(w, h, image) {
+        console.log("Setting image", w, h);
+
+       // resultMap.width = w
+       // resultMap.height = h
+       // resultMap.sourceSize.width = w
+      //  resultMap.sourceSize.height = h
+        flickable.contentWidth = w
+        flickable.contentHeight = h
+
+      //  lastSource = image
+
+      //  resultMap.source = ""
+      //  resultMap.source = applicationPath + "temp.png"
+        srtmMap.width = w
+        srtmMap.height = h
+        srtmMap.loadImage(image)
     }
 
     Flickable {
         id: flickable
-        anchors.rightMargin: 0
-        anchors.bottomMargin: 0
-        anchors.leftMargin: 0
-        anchors.topMargin: 0
+        clip: true
         anchors.fill: parent
+/*
+        Image {
+            id: resultMap
+            cache: false
+            fillMode: Image.PreserveAspectFit
+            scale: 1
+        }*/
 
-        GridView {
-            id: gridView1
-            anchors.fill: parent
-            delegate: Rectangle {
-                width: 1201
-                height: 1201
-                color: colorCode
-            }
-            cellHeight: 1201
-            cellWidth: 1201
-            model: ListModel {
-                ListElement {
-                    name: "Grey"
-                    colorCode: "grey"
-                }
-
-                ListElement {
-                    name: "Red"
-                    colorCode: "red"
-                }
-
-                ListElement {
-                    name: "Blue"
-                    colorCode: "blue"
-                }
-
-                ListElement {
-                    name: "Green"
-                    colorCode: "green"
-                }
-            }
+        SRTMMap {
+            id: srtmMap
         }
-
-
     }
 
 }

@@ -5,12 +5,81 @@ VXLESRTMLoader::VXLESRTMLoader(QObject *parent) : QObject(parent)
 
 }
 
+
+
 bool VXLESRTMLoader::loadSRTMData(QString folder)
 {
+
     QFile *folderFile = new QFile(folder);
     if(!folderFile->exists()) {
         return false;
     }
+
+    workerThread_ =  QSharedPointer<QThread>(new QThread());
+    worker_ =  QSharedPointer<VXLESRTMLoaderWorker>(new VXLESRTMLoaderWorker());
+    worker_->folder = folder;
+    worker_->tempImageFile = tempImageFile_;
+
+    worker_->moveToThread(workerThread_.data());
+
+    QObject::connect(workerThread_.data(), &QThread::started, worker_.data(), &VXLESRTMLoaderWorker::startWorker);
+    QObject::connect(worker_.data(), &VXLESRTMLoaderWorker::workerFinished, workerThread_.data(), &QThread::quit);
+
+    QObject::connect(worker_.data(), &VXLESRTMLoaderWorker::loadStarted, this, &VXLESRTMLoader::loadStarted);
+    QObject::connect(worker_.data(), &VXLESRTMLoaderWorker::loadedPercent, this, &VXLESRTMLoader::loadedPercent);
+    QObject::connect(worker_.data(), &VXLESRTMLoaderWorker::loadDone, this, &VXLESRTMLoader::loadDone);
+
+    workerThread_->start();
+   // QObject::connect(workerThread_.data(), &QThread::finished, this, &VXLESRTMLoader::workerThreadFinished);
+
+    return true;
+}
+/*
+void VXLESRTMLoader::workerThreadFinished(QPrivateSignal finished) {
+    qDebug() << "Thread finished";
+    workerThread_.clear();
+    worker_.clear();
+}*/
+
+QImage* VXLESRTMLoader::getResultMap()
+{
+    return resultImage_;
+}
+
+void VXLESRTMLoader::setResultMap(QImage* resultImage)
+{
+    resultImage_ = resultImage;
+    emit resultMapChanged();
+}
+
+QString VXLESRTMLoader::getTempImageFile()
+{
+    return tempImageFile_;
+}
+
+void VXLESRTMLoader::setTempImageFile(QString tempImageFile)
+{
+    tempImageFile_ = tempImageFile;
+    emit tempImageFileChanged();
+}
+
+VXLESRTMLoaderWorker::VXLESRTMLoaderWorker(QObject *parent)
+{
+
+}
+
+VXLESRTMLoaderWorker::~VXLESRTMLoaderWorker()
+{
+    qDebug() << "Worker destroyed";
+    if(timer) {
+        timer->stop();
+        delete timer;
+    }
+}
+
+
+void VXLESRTMLoaderWorker::startWorker()
+{
 
     emit loadStarted();
 
@@ -22,8 +91,11 @@ bool VXLESRTMLoader::loadSRTMData(QString folder)
     std::vector<std::vector<int>> locationMatrix(4, std::vector<int>(360));
 
     QDirIterator it(folder, QDirIterator::NoIteratorFlags);
+
+    emit loadedPercent(30, "Reading source files...");
+
     while(it.hasNext()) {
-        emit loadedPercent(0);
+        emit loadedPercent(0, "Reading source files...");
         QString file = it.next();
         //(N[0-9]+E[0-9]+).*.jpg
 
@@ -180,7 +252,6 @@ bool VXLESRTMLoader::loadSRTMData(QString folder)
         }
 
 
-        emit loadedPercent(100);
     }
 
     int widthCount = 0;
@@ -193,7 +264,7 @@ bool VXLESRTMLoader::loadSRTMData(QString folder)
         widthCount += locationMatrix[LOCATION_MATRIX_WEST_INDEX][i];
     }
 
-    emit loadedPercent(0);
+    emit loadedPercent(60, "Calculating dimensions...");
 
     int expectedWidth = widthCount * DEFAULT_WIDTH;
     int expectedHeight = heightCount * DEFAULT_HEIGHT;
@@ -201,8 +272,8 @@ bool VXLESRTMLoader::loadSRTMData(QString folder)
 
     int aspectRatio = expectedHeight / expectedWidth;
 
-    int supportedWidth = 10000;
-    int supportedHeight = 10000;
+    int supportedWidth = 8192;
+    int supportedHeight = 8192;
 
     float zoom = 1;
 
@@ -219,11 +290,36 @@ bool VXLESRTMLoader::loadSRTMData(QString folder)
     int xDelta = 0;
     int yDelta = 0;
 
-    qDebug() << "-------- NW --------";
-    for (SRTMPixmap map : northWestData) {
-        qDebug() << map.N << "-" << map.W;
+    emit loadedPercent(70, "Setting image...");
 
+    if(northWestData.size() > 0) {
+
+        int lastN = northWestData[0].N;
+        int lastW = northWestData[0].W;
+
+        qDebug() << "-------- NW --------";
+        for (SRTMPixmap map : northWestData) {
+            qDebug() << map.N << "-" << map.W;
+
+            if(lastN == map.N && lastW != map.W) {
+                xDelta ++;
+            } else if(lastN != map.N) {
+                yDelta ++;
+                xDelta = 0;
+            }
+
+             p.drawPixmap(
+                         xDelta * DEFAULT_WIDTH * zoom - 1,
+                         yDelta * DEFAULT_HEIGHT * zoom - 1,
+                         map.pixmap.scaled(DEFAULT_WIDTH * zoom, DEFAULT_HEIGHT * zoom, Qt::IgnoreAspectRatio)
+                         );
+
+            lastN = map.N;
+            lastW = map.W;
+        }
     }
+
+    yDelta = 0;
 
     if(northEastData.size() > 0) {
         int lastN = northEastData[0].N;
@@ -248,58 +344,97 @@ bool VXLESRTMLoader::loadSRTMData(QString folder)
                          map.pixmap.scaled(DEFAULT_WIDTH * zoom, DEFAULT_HEIGHT * zoom, Qt::IgnoreAspectRatio)
                          );
 
-            emit loadedImage(xDelta * DEFAULT_WIDTH, yDelta * DEFAULT_HEIGHT, map.pixmap.toImage());
             lastN = map.N;
             lastE = map.E;
         }
     }
 
-    qDebug() << "-------- SW --------";
-    for (SRTMPixmap map : southWestData) {
-        qDebug() << map.S << "-" << map.W;
+    xDelta = 0;
+
+
+    if(southWestData.size() > 0) {
+
+        int lastS = southWestData[0].S;
+        int lastW = southWestData[0].W;
+
+        qDebug() << "-------- SW --------";
+        for (SRTMPixmap map : southWestData) {
+            qDebug() << map.S << "-" << map.S;
+
+            if(lastS == map.S && lastW != map.W) {
+                xDelta ++;
+            } else if(lastS != map.S) {
+                yDelta ++;
+                xDelta = 0;
+            }
+
+             p.drawPixmap(
+                         xDelta * DEFAULT_WIDTH * zoom - 1,
+                         yDelta * DEFAULT_HEIGHT * zoom - 1,
+                         map.pixmap.scaled(DEFAULT_WIDTH * zoom, DEFAULT_HEIGHT * zoom, Qt::IgnoreAspectRatio)
+                         );
+
+            lastS = map.S;
+            lastW = map.W;
+        }
     }
 
-    qDebug() << "-------- SE --------";
-    for (SRTMPixmap map : southEastData) {
-        qDebug() << map.S << "-" << map.E;
+
+    if(southEastData.size() > 0) {
+        int lastS = southEastData[0].S;
+        int lastE = southEastData[0].E;
+
+        int xOriginDelta = xDelta;
+
+        qDebug() << "-------- SE --------";
+        for (SRTMPixmap map : southEastData) {
+            qDebug() << map.S << "-" << map.E;
+
+            if(lastS == map.S && lastE != map.E) {
+                xDelta ++;
+            } else if(lastS != map.S) {
+                yDelta ++;
+                xDelta = xOriginDelta;
+            }
+
+             p.drawPixmap(
+                         xDelta * DEFAULT_WIDTH * zoom - 1,
+                         yDelta * DEFAULT_HEIGHT * zoom - 1,
+                         map.pixmap.scaled(DEFAULT_WIDTH * zoom, DEFAULT_HEIGHT * zoom, Qt::IgnoreAspectRatio)
+                         );
+
+            lastS = map.S;
+            lastE = map.E;
+        }
     }
 
-    QImage* temp = resultImage_;
-    resultImage_ = &resultImage;
 
-    if(resultImage_->width() > 0 && resultImage_->height() > 0)
+    if(resultImage.width() > 0 && resultImage.height() > 0)
     {
-        resultImage_->save(tempImageFile_);
+        resultImage.save(tempImageFile);
     }
 
-    emit loadedPercent(100);
-    emit loadDone();
+    emit loadedPercent(90, "Creating temp file...");
+    expectedWidth_ = expectedWidth * zoom;
+    expectedHeight_ = expectedHeight * zoom;
 
-    if(temp != 0) {
-   //     delete temp;
+    timer = new QTimer();
+    QObject::connect(timer, &QTimer::timeout, this, &VXLESRTMLoaderWorker::checkForFileEmptiness);
+    timer->start(500);
+}
+
+void VXLESRTMLoaderWorker::checkForFileEmptiness()
+{
+    QFile *file = new QFile(tempImageFile);
+    if(file->exists()) {
+        if(file->size() > 0) {
+            emit loadDone(expectedWidth_, expectedHeight_, tempImageFile);
+            emit workerFinished();
+            timer->stop();
+        }
+    } else {
+        emit loadDone(expectedWidth_, expectedHeight_ , tempImageFile);
+        emit workerFinished();
+        timer->stop();
     }
-
-    return true;
-}
-
-QImage* VXLESRTMLoader::getResultMap()
-{
-    return resultImage_;
-}
-
-void VXLESRTMLoader::setResultMap(QImage* resultImage)
-{
-    resultImage_ = resultImage;
-    emit resultMapChanged();
-}
-
-QString VXLESRTMLoader::getTempImageFile()
-{
-    return tempImageFile_;
-}
-
-void VXLESRTMLoader::setTempImageFile(QString tempImageFile)
-{
-    tempImageFile_ = tempImageFile;
-    emit tempImageFileChanged();
 }

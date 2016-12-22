@@ -6,7 +6,8 @@ SOURCES += main.cpp \
     vxlemenucontroller.cpp \
     vxlemenuitem.cpp \
     vxletestapplicationsettings.cpp \
-    vxlesrtmloader.cpp
+    vxlesrtmloader.cpp \
+    vxlemaprenderer.cpp
 
 RESOURCES += qml.qrc
 
@@ -20,7 +21,8 @@ HEADERS += \
     vxlemenucontroller.h \
     vxlemenuitem.h \
     vxletestapplicationsettings.h \
-    vxlesrtmloader.h
+    vxlesrtmloader.h \
+    vxlemaprenderer.h
 
 release: DESTDIR = ./build-release
 debug:   DESTDIR = ./build-debug

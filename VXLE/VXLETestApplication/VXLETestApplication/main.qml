@@ -49,6 +49,7 @@ ApplicationWindow {
 
         resized()
         mainWindow.visible = true
+        console.log(applicationPath)
     }
 
     Item {
@@ -353,6 +354,8 @@ ApplicationWindow {
                     onSelected: {
                         resultMapBackground.color = "#46aae0"
                         resultMapContent.visible = true;
+                       // resultMapContent.setMap(resultMapContent.lastWidth, resultMapContent.lastHeight, resultMapContent.lastSource)
+
                     }
 
                     onDeselected: {
@@ -481,6 +484,7 @@ ApplicationWindow {
 
             onLoadedImage: {
                 resultMapMenuItem.enable()
+                resultMapContent.setMap(sourceWidth, sourceHeight, source)
             }
         }
 
@@ -516,7 +520,6 @@ ApplicationWindow {
         color: "#353C46"
         transparentBorder: true
     }
-
 
 }
 
