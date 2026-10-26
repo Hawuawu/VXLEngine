@@ -63,7 +63,8 @@ function createTerrainMaterial() {
     uOrigin: { value: new THREE.Vector3() },
     uGrid: { value: 1 },
     uVoxel: { value: 1 },
-    uHeights: { value: null as THREE.DataTexture | null },
+    uHeights: { value: null as THREE.DataArrayTexture | null },
+    uGridWidth: { value: 1 },
   };
   const material = new THREE.MeshLambertMaterial({ color: 0xffffff });
   material.onBeforeCompile = (shader) => {
@@ -85,7 +86,8 @@ uniform float uCell;
 uniform vec3 uOrigin;
 uniform float uGrid;
 uniform float uVoxel;
-uniform highp sampler2D uHeights;
+uniform highp sampler2DArray uHeights;
+uniform int uGridWidth;
 ${paletteGlsl()}`,
       )
       .replace(
@@ -94,9 +96,13 @@ ${paletteGlsl()}`,
 if (uVoxel > 0.5) {
   // Tint voxels by the cell's real mean height, not its rounded block level; walls belong to the cell behind them.
   vec2 cellPos = (vWorldPos.xz - uOrigin.xz) / uCell - vObjNormal.xz * 0.25;
-  ivec2 size = textureSize(uHeights, 0);
-  ivec2 cell = clamp(ivec2(floor(cellPos)), ivec2(0), size - 1);
-  elevation = texelFetch(uHeights, cell, 0).r;
+  // Heights are stored row-major and wrapped across layers to stay under MAX_TEXTURE_SIZE.
+  ivec3 size = textureSize(uHeights, 0);
+  int rows = (size.x * size.y * size.z) / uGridWidth;
+  ivec2 cell = clamp(ivec2(floor(cellPos)), ivec2(0), ivec2(uGridWidth - 1, rows - 1));
+  int idx = cell.y * uGridWidth + cell.x;
+  int r = idx / size.x;
+  elevation = texelFetch(uHeights, ivec3(idx - r * size.x, r % size.y, r / size.y), 0).r;
 }
 vec3 tint = hypso(elevation);
 if (uGrid > 0.5) {
@@ -311,10 +317,23 @@ worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
 
 function setHeightTexture(g: ActiveGrid): void {
   uniforms.uHeights.value?.dispose();
-  const tex = new THREE.DataTexture(g.heights, g.width, g.height, THREE.RedFormat, THREE.FloatType);
+  uniforms.uHeights.value = null;
+  if (g.mode !== 'voxel') return;
+  const n = g.width * g.height;
+  const side = Math.min(renderer.capabilities.maxTextureSize, 4096);
+  const texW = Math.min(n, side);
+  const rows = Math.ceil(n / texW);
+  const texH = Math.min(rows, side);
+  const layers = Math.ceil(rows / texH);
+  const data = new Float32Array(texW * texH * layers);
+  data.set(g.heights);
+  const tex = new THREE.DataArrayTexture(data, texW, texH, layers);
+  tex.format = THREE.RedFormat;
+  tex.type = THREE.FloatType;
   tex.minFilter = tex.magFilter = THREE.NearestFilter;
   tex.needsUpdate = true;
   uniforms.uHeights.value = tex;
+  uniforms.uGridWidth.value = g.width;
 }
 
 function updateGridUniform(): void {
