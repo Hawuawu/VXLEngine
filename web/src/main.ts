@@ -399,7 +399,7 @@ function pick(clientX: number, clientY: number): Hit | null {
   const minY = g.levels ? g.baseLevel * km : (Math.min(elevationRange[0], 0) * g.exaggeration) / 1000 - km;
   const box = new THREE.Box3(
     new THREE.Vector3(projection.xMin / 1000, minY, projection.zMin / 1000),
-    new THREE.Vector3(projection.xMax / 1000, maxY, projection.zMax / 1000),
+    new THREE.Vector3(projection.xMin / 1000 + g.width * km, maxY, projection.zMin / 1000 + g.height * km),
   );
   // intersectBox returns the exit point when the camera is inside the box, so start at the camera instead.
   const entry = box.containsPoint(ray.origin) ? ray.origin.clone() : ray.intersectBox(box, new THREE.Vector3());
