@@ -1,1 +1,3 @@
 VXLE/VXLETestApplication/build-*
+web/node_modules/
+web/dist/
