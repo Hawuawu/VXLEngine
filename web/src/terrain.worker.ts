@@ -329,34 +329,36 @@ function smoothChunk(grid: Grid, exaggeration: number, i0: number, j0: number, i
   const { width: W, height: H, heights, cellSize } = grid;
   const p = projection!;
   const km = cellSize / 1000;
-  const at = (i: number, j: number, fallback: number) => {
-    if (i < 0 || j < 0 || i >= W || j >= H) return fallback;
-    const h = heights[j * W + i];
-    return Number.isNaN(h) ? fallback : h;
+  const valid = (i: number, j: number) => i >= 0 && j >= 0 && i < W && j < H && !Number.isNaN(heights[j * W + i]);
+  // Vertices sit on cell corners so the mesh covers each cell's full footprint, out to the grid edges.
+  const corner = (ci: number, cj: number) => {
+    ci = Math.min(W, Math.max(0, ci));
+    cj = Math.min(H, Math.max(0, cj));
+    let sum = 0, n = 0;
+    for (let j = cj - 1; j <= cj; j++) {
+      for (let i = ci - 1; i <= ci; i++) {
+        if (valid(i, j)) { sum += heights[j * W + i]; n++; }
+      }
+    }
+    return n ? sum / n : NaN;
   };
   const b = new MeshBuilder();
   const nx = i1 - i0 + 1;
-  const nz = j1 - j0 + 1;
-  for (let j = j0; j <= j1; j++) {
-    for (let i = i0; i <= i1; i++) {
-      const h = at(i, j, 0);
-      const dx = ((at(i + 1, j, h) - at(i - 1, j, h)) * exaggeration) / (2 * cellSize);
-      const dz = ((at(i, j + 1, h) - at(i, j - 1, h)) * exaggeration) / (2 * cellSize);
+  for (let cj = j0; cj <= j1; cj++) {
+    for (let ci = i0; ci <= i1; ci++) {
+      const h = corner(ci, cj);
+      const y = Number.isNaN(h) ? 0 : h;
+      const or = (v: number) => (Number.isNaN(v) ? y : v);
+      const dx = ((or(corner(ci + 1, cj)) - or(corner(ci - 1, cj))) * exaggeration) / (2 * cellSize);
+      const dz = ((or(corner(ci, cj + 1)) - or(corner(ci, cj - 1))) * exaggeration) / (2 * cellSize);
       const len = Math.hypot(dx, 1, dz);
-      b.vertex(
-        p.xMin / 1000 + (i + 0.5) * km,
-        (h * exaggeration) / 1000,
-        p.zMin / 1000 + (j + 0.5) * km,
-        -dx / len, 1 / len, -dz / len,
-      );
+      b.vertex(p.xMin / 1000 + ci * km, (y * exaggeration) / 1000, p.zMin / 1000 + cj * km, -dx / len, 1 / len, -dz / len);
     }
   }
-  const valid = (i: number, j: number) => !Number.isNaN(heights[j * W + i]);
-  for (let j = 0; j < nz - 1; j++) {
-    for (let i = 0; i < nx - 1; i++) {
-      const gi = i0 + i, gj = j0 + j;
-      if (!valid(gi, gj) || !valid(gi + 1, gj) || !valid(gi, gj + 1) || !valid(gi + 1, gj + 1)) continue;
-      const nw = j * nx + i, ne = nw + 1, sw = nw + nx, se = sw + 1;
+  for (let j = j0; j < j1; j++) {
+    for (let i = i0; i < i1; i++) {
+      if (!valid(i, j)) continue;
+      const nw = (j - j0) * nx + (i - i0), ne = nw + 1, sw = nw + nx, se = sw + 1;
       b.triangle(sw, se, ne);
       b.triangle(sw, ne, nw);
     }
@@ -378,12 +380,7 @@ async function build(req: BuildRequest): Promise<void> {
   const chunks: [number, number, number, number][] = [];
   for (let j0 = 0; j0 < H; j0 += CHUNK) {
     for (let i0 = 0; i0 < W; i0 += CHUNK) {
-      if (voxel) {
-        chunks.push([i0, j0, Math.min(i0 + CHUNK, W), Math.min(j0 + CHUNK, H)]);
-      } else {
-        const i1 = Math.min(i0 + CHUNK, W - 1), j1 = Math.min(j0 + CHUNK, H - 1);
-        if (i1 > i0 && j1 > j0) chunks.push([i0, j0, i1, j1]);
-      }
+      chunks.push([i0, j0, Math.min(i0 + CHUNK, W), Math.min(j0 + CHUNK, H)]);
     }
   }
 

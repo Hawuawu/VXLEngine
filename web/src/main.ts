@@ -62,6 +62,8 @@ function createTerrainMaterial() {
     uCell: { value: 0.5 },
     uOrigin: { value: new THREE.Vector3() },
     uGrid: { value: 1 },
+    uVoxel: { value: 1 },
+    uHeights: { value: null as THREE.DataTexture | null },
   };
   const material = new THREE.MeshLambertMaterial({ color: 0xffffff });
   material.onBeforeCompile = (shader) => {
@@ -82,11 +84,20 @@ uniform float uExag;
 uniform float uCell;
 uniform vec3 uOrigin;
 uniform float uGrid;
+uniform float uVoxel;
+uniform highp sampler2D uHeights;
 ${paletteGlsl()}`,
       )
       .replace(
         'vec4 diffuseColor = vec4( diffuse, opacity );',
         `float elevation = vWorldPos.y * 1000.0 / uExag;
+if (uVoxel > 0.5) {
+  // Tint voxels by the cell's real mean height, not its rounded block level; walls belong to the cell behind them.
+  vec2 cellPos = (vWorldPos.xz - uOrigin.xz) / uCell - vObjNormal.xz * 0.25;
+  ivec2 size = textureSize(uHeights, 0);
+  ivec2 cell = clamp(ivec2(floor(cellPos)), ivec2(0), size - 1);
+  elevation = texelFetch(uHeights, cell, 0).r;
+}
 vec3 tint = hypso(elevation);
 if (uGrid > 0.5) {
   vec3 p = (vWorldPos - uOrigin) / uCell;
@@ -280,6 +291,8 @@ worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
       uniforms.uExag.value = activeGrid.exaggeration;
       uniforms.uCell.value = activeGrid.cellSize / 1000;
       uniforms.uOrigin.value.set(projection.xMin / 1000, 0, projection.zMin / 1000);
+      uniforms.uVoxel.value = activeGrid.mode === 'voxel' ? 1 : 0;
+      setHeightTexture(activeGrid);
       updateGridUniform();
       setStatus(`Ready · built in ${(msg.ms / 1000).toFixed(2)} s`, null);
       renderStats({
@@ -295,6 +308,14 @@ worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
       break;
   }
 };
+
+function setHeightTexture(g: ActiveGrid): void {
+  uniforms.uHeights.value?.dispose();
+  const tex = new THREE.DataTexture(g.heights, g.width, g.height, THREE.RedFormat, THREE.FloatType);
+  tex.minFilter = tex.magFilter = THREE.NearestFilter;
+  tex.needsUpdate = true;
+  uniforms.uHeights.value = tex;
+}
 
 function updateGridUniform(): void {
   uniforms.uGrid.value = ui.grid.checked && activeGrid?.mode === 'voxel' ? 1 : 0;
@@ -346,15 +367,23 @@ function surfaceAt(g: ActiveGrid, x: number, z: number): { y: number; i: number;
     const lv = g.levels[j * g.width + i];
     return lv === MISSING_LEVEL ? null : { y: lv * km, i, j };
   }
-  const h = (ii: number, jj: number) => {
-    const v = g.heights[Math.min(g.height - 1, Math.max(0, jj)) * g.width + Math.min(g.width - 1, Math.max(0, ii))];
-    return Number.isNaN(v) ? NaN : v;
+  if (Number.isNaN(g.heights[j * g.width + i])) return null;
+  // Smooth vertices sit on cell corners (mean of the adjacent valid cells), matching the worker's mesh.
+  const corner = (ci: number, cj: number) => {
+    let sum = 0, n = 0;
+    for (let jj = cj - 1; jj <= cj; jj++) {
+      for (let ii = ci - 1; ii <= ci; ii++) {
+        if (ii < 0 || jj < 0 || ii >= g.width || jj >= g.height) continue;
+        const v = g.heights[jj * g.width + ii];
+        if (!Number.isNaN(v)) { sum += v; n++; }
+      }
+    }
+    return sum / n;
   };
-  const cx = fx - 0.5, cz = fz - 0.5;
-  const ci = Math.floor(cx), cj = Math.floor(cz);
-  const tx = cx - ci, tz = cz - cj;
+  const tx = fx - i, tz = fz - j;
   const v =
-    h(ci, cj) * (1 - tx) * (1 - tz) + h(ci + 1, cj) * tx * (1 - tz) + h(ci, cj + 1) * (1 - tx) * tz + h(ci + 1, cj + 1) * tx * tz;
+    corner(i, j) * (1 - tx) * (1 - tz) + corner(i + 1, j) * tx * (1 - tz) +
+    corner(i, j + 1) * (1 - tx) * tz + corner(i + 1, j + 1) * tx * tz;
   return Number.isNaN(v) ? null : { y: (v * g.exaggeration) / 1000, i, j };
 }
 
